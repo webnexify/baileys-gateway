@@ -3,12 +3,10 @@ const {
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  makeInMemoryStore,
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
-const fs = require('fs');
 
 (async () => {
   const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
@@ -49,21 +47,36 @@ const fs = require('fs');
 
     console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
 
-    if (isGroup && text.toLowerCase().startsWith('.tagall')) {
-      try {
-        const groupMetadata = await sock.groupMetadata(from);
-        const mentions = groupMetadata.participants.map((p) => p.id);
-        const names = groupMetadata.participants.map((p) => `@${p.id.split('@')[0]}`).join(' ');
+    let participants = [];
 
-        await sock.sendMessage(from, {
-          text: `📢 Tagging everyone:\n${names}`,
-          mentions,
-        });
+    if (isGroup) {
+      try {
+        const metadata = await sock.groupMetadata(from);
+        participants = metadata.participants.map((p) => p.id);
       } catch (err) {
-        console.error('Error sending .tagall:', err.message);
+        console.error('❌ Failed to fetch group metadata:', err.message);
       }
-    } else if (text.toLowerCase() === 'hi') {
-      await sock.sendMessage(from, { text: '👋 Hello there!' });
+    }
+
+    // ✅ Send to Flask backend and relay response
+    try {
+      const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
+        from,
+        text,
+        isGroup,
+        participants,
+      });
+
+      console.log('📥 Flask response:', response.data);
+
+      if (response.data.reply) {
+        await sock.sendMessage(from, {
+          text: response.data.reply,
+          mentions: response.data.mentions || [],
+        });
+      }
+    } catch (err) {
+      console.error('❌ Error sending to Flask bot:', err.message);
     }
   });
 })();

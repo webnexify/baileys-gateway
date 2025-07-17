@@ -1,7 +1,6 @@
 {
   "name": "nodejs",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,6 +9,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^22.13.11"
-  }
+    "@hapi/boom": "^10.0.1",
+    "@types/node": "^22.13.11",
+    "@whiskeysockets/baileys": "^6.5.0",
+    "@whiskeysockets/bailyes": "file:.5.0",
+    "axios": "^1.10.0"
+  },
+  "description": ""
 }

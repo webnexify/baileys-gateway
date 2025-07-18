@@ -62,6 +62,11 @@ const axios = require('axios');
       msg.message.extendedTextMessage?.text ||
       '';
 
+    const type = msg.message?.stickerMessage
+    ? 'sticker'
+    : (msg.message.conversation || msg.message.extendedTextMessage?.text ? 'text' : null);
+
+
     console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
 
     let participants = [];
@@ -83,6 +88,7 @@ const axios = require('axios');
       const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
         from,
         text,
+        type,
         isGroup,
         participants,
         admins,

@@ -60,7 +60,11 @@ const axios = require('axios');
     const text =
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
+      msg.message.imageMessage?.caption ||
+      msg.message.videoMessage?.caption ||
+      msg.message.stickerMessage?.caption ||
       '';
+
 
     const type = msg.message?.stickerMessage
     ? 'sticker'

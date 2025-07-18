@@ -2,6 +2,7 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const { Boom } = require('@hapi/boom');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
+const cron = require('node-cron');
 
 (async () => {
   const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
@@ -15,19 +16,49 @@ const axios = require('axios');
     if (connection === 'close') {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       console.log('🔌 Disconnected. Reconnect?', shouldReconnect);
-      if (shouldReconnect) startSock();
+      if (shouldReconnect) {
+        // Re-run main function to reconnect
+        require('child_process').fork(__filename); // 💡 safest restart trick
+        process.exit();
+      }
     } else if (connection === 'open') {
       console.log('✅ Connected to WhatsApp!');
     }
   });
 
-  // ✅ WELCOME HANDLER
+  // 🌅 DAILY MORNING MESSAGE at 6:00 AM IST (which is 0:30 UTC)
+  cron.schedule('30 0 * * *', async () => {
+    try {
+      console.log('🌄 Sending morning messages...');
+
+      const allChats = await sock.groupFetchAllParticipating();
+      const groupIds = Object.keys(allChats);
+
+      const messages = [
+        "🌞 Good Morning Gamers! 🎮 Let’s grind!",
+        "🔥 New day, new loot! Good morning warriors!",
+        "⚔️ Rise and shine, time to conquer!",
+        "💡 Level up IRL too — good morning!"
+      ];
+      const message = messages[Math.floor(Math.random() * messages.length)];
+
+      for (const groupId of groupIds) {
+        await sock.sendMessage(groupId, { text: message });
+      }
+
+      console.log('✅ Morning messages sent!');
+    } catch (err) {
+      console.error('❌ Error sending morning messages:', err.message);
+    }
+  });
+
+  // 👋 Welcome New Participants
   sock.ev.on('group-participants.update', async (update) => {
     const { id, participants, action } = update;
     if (action === 'add' && participants.length > 0) {
       try {
         const metadata = await sock.groupMetadata(id);
-        const allParticipants = metadata.participants.map((p) => p.id);
+        const allParticipants = metadata.participants.map(p => p.id);
 
         const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
           from: id,
@@ -43,12 +74,12 @@ const axios = require('axios');
           });
         }
       } catch (err) {
-        console.error('❌ Error sending welcome message:', err.message);
+        console.error('❌ Welcome message error:', err.message);
       }
     }
   });
 
-  // ✅ MESSAGE HANDLER
+  // 💬 Handle Messages
   sock.ev.on('messages.upsert', async (m) => {
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
     const msg = m.messages[0];
@@ -62,8 +93,7 @@ const axios = require('axios');
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
       msg.message.imageMessage?.caption ||
-      msg.message.videoMessage?.caption ||
-      '';
+      msg.message.videoMessage?.caption || '';
 
     const type = msg.message?.stickerMessage
       ? 'sticker'
@@ -82,15 +112,14 @@ const axios = require('axios');
           .filter((p) => p.admin !== null)
           .map((p) => p.id);
       } catch (err) {
-        console.error('❌ Failed to fetch group metadata:', err.message);
+        console.error('❌ Group metadata error:', err.message);
       }
     }
 
-    // ✅ Delete links shared by non-admins
+    // 🚫 Delete non-admin link shares
     if (isGroup && linkRegex.test(text)) {
       if (!admins.includes(sender)) {
         try {
-          // Delete message
           await sock.sendMessage(from, {
             delete: {
               remoteJid: from,
@@ -100,30 +129,25 @@ const axios = require('axios');
             }
           });
 
-          // Warn sender
           await sock.sendMessage(from, {
             text: `🚫 *Only group admins* are allowed to share links, @${sender.split('@')[0]}.`,
             mentions: [sender]
           });
 
-          // Optional: log to admin group
-          const LOG_GROUP_ID = "1203630xxxxxxx@g.us"; // ✅ Replace with real log group ID
+          const LOG_GROUP_ID = "1203630xxxxxxx@g.us"; // replace with your actual log group ID
           await sock.sendMessage(LOG_GROUP_ID, {
-            text: `🛡️ *Link blocked*
-👥 Group: ${from}
-👤 Sender: @${sender.split('@')[0]}
-🔗 Link: ${text}`,
+            text: `🛡️ *Link blocked*\n👥 Group: ${from}\n👤 Sender: @${sender.split('@')[0]}\n🔗 Link: ${text}`,
             mentions: [sender]
           });
 
-          return; // skip rest
+          return;
         } catch (err) {
-          console.error('❌ Failed to handle link deletion:', err.message);
+          console.error('❌ Link deletion error:', err.message);
         }
       }
     }
 
-    // ✅ Forward message to Flask bot
+    // 🤝 Forward to Flask Bot
     try {
       const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
         from,
@@ -148,7 +172,7 @@ const axios = require('axios');
         });
       }
     } catch (err) {
-      console.error('❌ Error sending to Flask bot:', err.message);
+      console.error('❌ Flask bot error:', err.message);
     }
   });
 })();

@@ -21,13 +21,13 @@ const axios = require('axios');
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
     if (qr) {
-      console.log('Scan the QR Code below:');
+      console.log('📷 Scan the QR Code below:');
       qrcode.generate(qr, { small: true });
     }
     if (connection === 'close') {
       const shouldReconnect =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('Connection closed. Reconnecting...', shouldReconnect);
+      console.log('🔌 Connection closed. Reconnecting...', shouldReconnect);
       if (shouldReconnect) {
         startSock();
       }
@@ -36,23 +36,51 @@ const axios = require('axios');
     }
   });
 
+  sock.ev.on('group-participants.update', async (update) => {
+    const { id, participants, action } = update;
+    if (action === 'add' && participants.length > 0) {
+      try {
+        const metadata = await sock.groupMetadata(id);
+        const allParticipants = metadata.participants.map((p) => p.id);
+
+        await axios.post('https://whtzaap-bot.onrender.com/message', {
+          from: id,
+          isGroup: true,
+          participants: allParticipants,
+          joined: participants,
+        });
+      } catch (err) {
+        console.error('❌ Error handling group join:', err.message);
+      }
+    }
+  });
+
+
   sock.ev.on('messages.upsert', async (m) => {
     const msg = m.messages[0];
     if (!msg.message || msg.key.fromMe) return;
 
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith('@g.us');
+    const sender = msg.key.participant || msg.key.remoteJid;
+
     const text =
-      msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+      msg.message.conversation ||
+      msg.message.extendedTextMessage?.text ||
+      '';
 
     console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
 
     let participants = [];
+    let admins = [];
 
     if (isGroup) {
       try {
         const metadata = await sock.groupMetadata(from);
         participants = metadata.participants.map((p) => p.id);
+        admins = metadata.participants
+          .filter((p) => p.admin !== null)
+          .map((p) => p.id);
       } catch (err) {
         console.error('❌ Failed to fetch group metadata:', err.message);
       }
@@ -65,6 +93,8 @@ const axios = require('axios');
         text,
         isGroup,
         participants,
+        admins,
+        sender
       });
 
       console.log('📥 Flask response:', response.data);

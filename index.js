@@ -1,71 +1,54 @@
-const {
-  default: makeWASocket,
-  DisconnectReason,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-} = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 
 (async () => {
   const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
-
-  const sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: true,
-  });
+  const sock = makeWASocket({ auth: state, printQRInTerminal: true });
 
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
-    if (qr) {
-      console.log('📷 Scan the QR Code below:');
-      qrcode.generate(qr, { small: true });
-    }
+    if (qr) qrcode.generate(qr, { small: true });
     if (connection === 'close') {
-      const shouldReconnect =
-        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('🔌 Connection closed. Reconnecting...', shouldReconnect);
-      if (shouldReconnect) {
-        startSock();
-      }
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      console.log('🔌 Disconnected. Reconnect?', shouldReconnect);
+      if (shouldReconnect) startSock();
     } else if (connection === 'open') {
       console.log('✅ Connected to WhatsApp!');
     }
   });
 
-  // ✅ This should be near the top level inside the main async function
+  // ✅ WELCOME HANDLER (defined once only!)
   sock.ev.on('group-participants.update', async (update) => {
     const { id, participants, action } = update;
-
     if (action === 'add' && participants.length > 0) {
       try {
         const metadata = await sock.groupMetadata(id);
         const allParticipants = metadata.participants.map((p) => p.id);
 
-        // ✅ Send to Flask
         const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
           from: id,
           isGroup: true,
           participants: allParticipants,
-          joined: participants,
+          joined: participants
         });
 
         if (response.data.reply) {
           await sock.sendMessage(id, {
             text: response.data.reply,
-            mentions: response.data.mentions || [],
+            mentions: response.data.mentions || []
           });
         }
       } catch (err) {
-        console.error('❌ Error in group join event:', err.message);
+        console.error('❌ Error sending welcome message:', err.message);
       }
     }
   });
 
-
+  // ✅ MESSAGE HANDLER
   sock.ev.on('messages.upsert', async (m) => {
     const msg = m.messages[0];
     if (!msg.message || msg.key.fromMe) return;
@@ -96,37 +79,6 @@ const axios = require('axios');
       }
     }
 
-    // ✅ Listen for new group participants
-    sock.ev.on('group-participants.update', async (update) => {
-      const { id, participants, action } = update;
-
-      if (action === 'add' && participants.length > 0) {
-        try {
-          const metadata = await sock.groupMetadata(id);
-          const allParticipants = metadata.participants.map((p) => p.id);
-
-          // ✅ Send to Flask for welcome message
-          const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
-            from: id,
-            isGroup: true,
-            participants: allParticipants,
-            joined: participants
-          });
-
-          if (response.data.reply) {
-            await sock.sendMessage(id, {
-              text: response.data.reply,
-              mentions: response.data.mentions || []
-            });
-          }
-        } catch (err) {
-          console.error('❌ Error in group join event:', err.message);
-        }
-      }
-    });
-
-
-    // ✅ Send to Flask backend and relay response
     try {
       const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
         from,

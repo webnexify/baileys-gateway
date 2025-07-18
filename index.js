@@ -96,6 +96,9 @@ const axios = require('axios');
       });
 
       console.log('📥 Flask response:', response.data);
+      if (response.data.delete) {
+        await sock.sendMessage(from, { delete: msg.key });  // 🔥 delete the original message
+      }
 
       if (response.data.reply) {
         await sock.sendMessage(from, {

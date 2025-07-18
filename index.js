@@ -21,7 +21,7 @@ const axios = require('axios');
     }
   });
 
-  // ✅ WELCOME HANDLER (defined once only!)
+  // ✅ WELCOME HANDLER
   sock.ev.on('group-participants.update', async (update) => {
     const { id, participants, action } = update;
     if (action === 'add' && participants.length > 0) {
@@ -48,8 +48,8 @@ const axios = require('axios');
     }
   });
 
-// ✅ MESSAGE HANDLER
-sock.ev.on('messages.upsert', async (m) => {
+  // ✅ MESSAGE HANDLER
+  sock.ev.on('messages.upsert', async (m) => {
     const linkRegex = /(https?:\/\/[^\s]+)/gi;
     const msg = m.messages[0];
     if (!msg.message || msg.key.fromMe) return;
@@ -107,9 +107,12 @@ sock.ev.on('messages.upsert', async (m) => {
           });
 
           // Optional: log to admin group
-          const LOG_GROUP_ID = "your-log-group@g.us"; // replace with real group ID
+          const LOG_GROUP_ID = "1203630xxxxxxx@g.us"; // ✅ Replace with real log group ID
           await sock.sendMessage(LOG_GROUP_ID, {
-            text: `🛡️ *Link blocked*\n👥 Group: ${from}\n👤 Sender: @${sender.split('@')[0]}\n🔗 Link: ${text}`,
+            text: `🛡️ *Link blocked*
+👥 Group: ${from}
+👤 Sender: @${sender.split('@')[0]}
+🔗 Link: ${text}`,
             mentions: [sender]
           });
 
@@ -148,4 +151,4 @@ sock.ev.on('messages.upsert', async (m) => {
       console.error('❌ Error sending to Flask bot:', err.message);
     }
   });
-  });
+})();

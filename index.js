@@ -36,6 +36,7 @@ const axios = require('axios');
     }
   });
 
+  // ✅ This should be near the top level inside the main async function
   sock.ev.on('group-participants.update', async (update) => {
     const { id, participants, action } = update;
 
@@ -44,7 +45,7 @@ const axios = require('axios');
         const metadata = await sock.groupMetadata(id);
         const allParticipants = metadata.participants.map((p) => p.id);
 
-        // Send to Flask backend
+        // ✅ Send to Flask
         const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
           from: id,
           isGroup: true,
@@ -59,11 +60,10 @@ const axios = require('axios');
           });
         }
       } catch (err) {
-        console.error('❌ Error handling group join:', err.message);
+        console.error('❌ Error in group join event:', err.message);
       }
     }
   });
-
 
 
   sock.ev.on('messages.upsert', async (m) => {

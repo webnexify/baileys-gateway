@@ -86,6 +86,36 @@ const axios = require('axios');
       }
     }
 
+    // ✅ Listen for new group participants
+    sock.ev.on('group-participants.update', async (update) => {
+      const { id, participants, action } = update;
+
+      if (action === 'add' && participants.length > 0) {
+        try {
+          const metadata = await sock.groupMetadata(id);
+          const allParticipants = metadata.participants.map((p) => p.id);
+
+          // ✅ Send to Flask for welcome message
+          const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
+            from: id,
+            isGroup: true,
+            participants: allParticipants,
+            joined: participants
+          });
+
+          if (response.data.reply) {
+            await sock.sendMessage(id, {
+              text: response.data.reply,
+              mentions: response.data.mentions || []
+            });
+          }
+        } catch (err) {
+          console.error('❌ Error in group join event:', err.message);
+        }
+      }
+    });
+
+
     // ✅ Send to Flask backend and relay response
     try {
       const response = await axios.post('https://whtzaap-bot.onrender.com/message', {

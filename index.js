@@ -48,48 +48,49 @@ const axios = require('axios');
     }
   });
 
-  // ✅ MESSAGE HANDLER
-    sock.ev.on('messages.upsert', async (m) => {
-      const msg = m.messages[0];
-      if (!msg.message || msg.key.fromMe) return;
+// ✅ MESSAGE HANDLER
+sock.ev.on('messages.upsert', async (m) => {
+    const linkRegex = /(https?:\/\/[^\s]+)/gi;
+    const msg = m.messages[0];
+    if (!msg.message || msg.key.fromMe) return;
 
-      const from = msg.key.remoteJid;
-      const isGroup = from.endsWith('@g.us');
-      const sender = msg.key.participant || msg.key.remoteJid;
+    const from = msg.key.remoteJid;
+    const isGroup = from.endsWith('@g.us');
+    const sender = msg.key.participant || msg.key.remoteJid;
 
-      const text =
-        msg.message.conversation ||
-        msg.message.extendedTextMessage?.text ||
-        msg.message.imageMessage?.caption ||
-        msg.message.videoMessage?.caption ||
-        msg.message.stickerMessage?.caption ||
-        '';
+    const text =
+      msg.message.conversation ||
+      msg.message.extendedTextMessage?.text ||
+      msg.message.imageMessage?.caption ||
+      msg.message.videoMessage?.caption ||
+      '';
 
-      const msgType = Object.keys(msg.message)[0];
-      const type = msgType.replace('Message', '').toLowerCase(); // e.g., "text", "sticker"
+    const type = msg.message?.stickerMessage
+      ? 'sticker'
+      : (msg.message.conversation || msg.message.extendedTextMessage?.text
+        ? 'text'
+        : null);
 
-      console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
+    console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
 
-      let participants = [];
-      let admins = [];
-
-      if (isGroup) {
-        try {
-          const metadata = await sock.groupMetadata(from);
-          participants = metadata.participants.map((p) => p.id);
-          admins = metadata.participants
-            .filter((p) => p.admin !== null)
-            .map((p) => p.id);
-        } catch (err) {
-          console.error('❌ Failed to fetch group metadata:', err.message);
-        }
+    let participants = [], admins = [];
+    if (isGroup) {
+      try {
+        const metadata = await sock.groupMetadata(from);
+        participants = metadata.participants.map((p) => p.id);
+        admins = metadata.participants
+          .filter((p) => p.admin !== null)
+          .map((p) => p.id);
+      } catch (err) {
+        console.error('❌ Failed to fetch group metadata:', err.message);
       }
+    }
 
-      // ✅ Block non-admin link sharing (AFTER metadata is ready)
-      const linkRegex = /(https?:\/\/[^\s]+)/gi;
-      if (isGroup && linkRegex.test(text)) {
-        if (!admins.includes(sender)) {
-          // 1. Delete the message
+    // ✅ Delete links shared by non-admins
+    if (isGroup && linkRegex.test(text)) {
+      if (!admins.includes(sender)) {
+        try {
+          // Delete message
           await sock.sendMessage(from, {
             delete: {
               remoteJid: from,
@@ -99,45 +100,27 @@ const axios = require('axios');
             }
           });
 
-          // 2. Send warning
+          // Warn sender
           await sock.sendMessage(from, {
-            text: `🚫 Only *group admins* can share links, @${sender.split('@')[0]}.`,
+            text: `🚫 *Only group admins* are allowed to share links, @${sender.split('@')[0]}.`,
             mentions: [sender]
           });
 
-          return; // 🔚 stop further processing
-        }
-      }
-
-      // ✅ Send to Flask backend
-      try {
-        const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
-          from,
-          text,
-          type,
-          isGroup,
-          participants,
-          admins,
-          sender
-        });
-
-        console.log('📥 Flask response:', response.data);
-
-        if (response.data.delete) {
-          await sock.sendMessage(from, { delete: msg.key });
-        }
-
-        if (response.data.reply) {
-          await sock.sendMessage(from, {
-            text: response.data.reply,
-            mentions: response.data.mentions || [],
+          // Optional: log to admin group
+          const LOG_GROUP_ID = "your-log-group@g.us"; // replace with real group ID
+          await sock.sendMessage(LOG_GROUP_ID, {
+            text: `🛡️ *Link blocked*\n👥 Group: ${from}\n👤 Sender: @${sender.split('@')[0]}\n🔗 Link: ${text}`,
+            mentions: [sender]
           });
-        }
-      } catch (err) {
-        console.error('❌ Error sending to Flask bot:', err.message);
-      }
-    });
 
+          return; // skip rest
+        } catch (err) {
+          console.error('❌ Failed to handle link deletion:', err.message);
+        }
+      }
+    }
+
+    // ✅ Forward message to Flask bot
     try {
       const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
         from,
@@ -150,8 +133,9 @@ const axios = require('axios');
       });
 
       console.log('📥 Flask response:', response.data);
+
       if (response.data.delete) {
-        await sock.sendMessage(from, { delete: msg.key });  // 🔥 delete the original message
+        await sock.sendMessage(from, { delete: msg.key });
       }
 
       if (response.data.reply) {
@@ -163,4 +147,5 @@ const axios = require('axios');
     } catch (err) {
       console.error('❌ Error sending to Flask bot:', err.message);
     }
+  });
   });

@@ -118,34 +118,22 @@ const cron = require('node-cron');
 
     // 🚫 Delete non-admin link shares
     if (isGroup && linkRegex.test(text)) {
-      if (!admins.includes(sender)) {
-        try {
-          await sock.sendMessage(from, {
-            delete: {
-              remoteJid: from,
-              fromMe: false,
-              id: msg.key.id,
-              participant: sender
-            }
-          });
-
-          await sock.sendMessage(from, {
-            text: `🚫 *Only group admins* are allowed to share links, @${sender.split('@')[0]}.`,
-            mentions: [sender]
-          });
-
-          const LOG_GROUP_ID = "1203630xxxxxxx@g.us"; // replace with your actual log group ID
-          await sock.sendMessage(LOG_GROUP_ID, {
-            text: `🛡️ *Link blocked*\n👥 Group: ${from}\n👤 Sender: @${sender.split('@')[0]}\n🔗 Link: ${text}`,
-            mentions: [sender]
-          });
-
-          return;
-        } catch (err) {
-          console.error('❌ Link deletion error:', err.message);
+  if (!admins.includes(sender)) {
+    try {
+      await sock.sendMessage(from, {
+        delete: {
+          remoteJid: from,
+          fromMe: false,
+          id: msg.key.id,
+          participant: sender
         }
-      }
+      });
+
+    } catch (err) {
+      console.error('❌ Failed to delete link message:', err.message);
     }
+  }
+}
 
     // 🤝 Forward to Flask Bot
     try {

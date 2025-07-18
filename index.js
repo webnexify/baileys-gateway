@@ -60,34 +60,11 @@ const axios = require('axios');
     const text =
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
-      msg.message.imageMessage?.caption ||
-      msg.message.videoMessage?.caption ||
-      msg.message.stickerMessage?.caption ||
       '';
 
-
-    const msgType = Object.keys(msg.message)[0];
-    let sticker_text = "";
-
-    if (msgType === 'stickerMessage') {
-      const stickerMessage = msg.message.stickerMessage;
-
-      // Try caption (some stickers may include this if forwarded/shared)
-      sticker_text = stickerMessage?.contextInfo?.caption || '';
-
-      // As fallback, also try matchedText (seen in custom stickers)
-      if (!sticker_text && stickerMessage?.contextInfo?.matchedText) {
-        sticker_text = stickerMessage.contextInfo.matchedText;
-      }
-
-      // Also fallback to any `selectedDisplayText` if available
-      if (!sticker_text && stickerMessage?.contextInfo?.externalAdReply?.title) {
-        sticker_text = stickerMessage.contextInfo.externalAdReply.title;
-      }
-
-      // Optional: Log for debug
-      console.log("🧩 Sticker Text:", sticker_text);
-    }
+    const type = msg.message?.stickerMessage
+    ? 'sticker'
+    : (msg.message.conversation || msg.message.extendedTextMessage?.text ? 'text' : null);
 
 
     console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
@@ -115,9 +92,7 @@ const axios = require('axios');
         isGroup,
         participants,
         admins,
-        sender,
-        type: msgType.replace('Message', '').toLowerCase(),//"sticker"
-        sticker_text // pass this
+        sender
       });
 
       console.log('📥 Flask response:', response.data);

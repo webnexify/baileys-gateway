@@ -1,31 +1,38 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
-const qrcode = require('qrcode-terminal');
-const axios = require('axios');
-const cron = require('node-cron');
+  // ✅ 1. Start Express First (for UptimeRobot keep-alive)
+  const express = require("express");
+  const app = express();
+  app.get("/", (_, res) => res.send("Bot is running."));
+  app.listen(3000, () => console.log("✅ Web server started on port 3000"));
 
-(async () => {
-  const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
-  const sock = makeWASocket({ auth: state, printQRInTerminal: true });
+  // ✅ 2. Then import other modules and start bot
+  const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+  const { Boom } = require('@hapi/boom');
+  const qrcode = require('qrcode-terminal');
+  const axios = require('axios');
+  const cron = require('node-cron');
 
-  sock.ev.on('creds.update', saveCreds);
+  // ✅ 3. Main bot logic inside async wrapper
+  (async () => {
+    const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
+    const sock = makeWASocket({ auth: state, printQRInTerminal: true });
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
-    if (qr) qrcode.generate(qr, { small: true });
-    if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('🔌 Disconnected. Reconnect?', shouldReconnect);
-      if (shouldReconnect) {
-        // Re-run main function to reconnect
-        require('child_process').fork(__filename); // 💡 safest restart trick
-        process.exit();
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', (update) => {
+      const { connection, lastDisconnect, qr } = update;
+      if (qr) qrcode.generate(qr, { small: true });
+      if (connection === 'close') {
+        const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+        console.log('🔌 Disconnected. Reconnect?', shouldReconnect);
+        if (shouldReconnect) {
+          require('child_process').fork(__filename);
+          process.exit();
+        }
+      } else if (connection === 'open') {
+        console.log('✅ Connected to WhatsApp!');
       }
-    } else if (connection === 'open') {
-      console.log('✅ Connected to WhatsApp!');
-    }
-  });
-
+    });
+    
   // 🌅 DAILY MORNING MESSAGE at 6:00 AM IST (which is 0:30 UTC)
   cron.schedule('30 0 * * *', async () => {
     try {

@@ -1,46 +1,43 @@
-  // ✅ 1. Start Express First (for UptimeRobot keep-alive)
-  const express = require("express");
-  const app = express();
-  app.get("/", (_, res) => res.send("Bot is running."));
-  app.listen(3000, () => console.log("✅ Web server started on port 3000"));
+// ✅ 1. Start Express First (for UptimeRobot keep-alive)
+const express = require("express");
+const app = express();
+app.get("/", (_, res) => res.send("Bot is running."));
+app.listen(3000, () => console.log("✅ Web server started on port 3000"));
 
-  // ✅ 2. Then import other modules and start bot
-  const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-  const { Boom } = require('@hapi/boom');
-  const qrcode = require('qrcode-terminal');
-  const axios = require('axios');
-  const cron = require('node-cron');
+// ✅ 2. Import other modules
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
+const qrcode = require('qrcode-terminal');
+const axios = require('axios');
+const cron = require('node-cron');
 
-  // ✅ 3. Main bot logic inside async wrapper
-  (async () => {
-    const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
-    const sock = makeWASocket({ auth: state, printQRInTerminal: true });
+// ✅ 3. Main bot logic
+(async () => {
+  const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
+  const sock = makeWASocket({ auth: state, printQRInTerminal: true });
 
-    sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', (update) => {
-      const { connection, lastDisconnect, qr } = update;
-      if (qr) qrcode.generate(qr, { small: true });
-      if (connection === 'close') {
-        const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-        console.log('🔌 Disconnected. Reconnect?', shouldReconnect);
-        if (shouldReconnect) {
-          require('child_process').fork(__filename);
-          process.exit();
-        }
-      } else if (connection === 'open') {
-        console.log('✅ Connected to WhatsApp!');
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect, qr } = update;
+    if (qr) qrcode.generate(qr, { small: true });
+    if (connection === 'close') {
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      console.log('🔌 Disconnected. Reconnect?', shouldReconnect);
+      if (shouldReconnect) {
+        require('child_process').fork(__filename);
+        process.exit();
       }
-    });
-    
-  // 🌅 DAILY MORNING MESSAGE at 6:00 AM IST (which is 0:30 UTC)
+    } else if (connection === 'open') {
+      console.log('✅ Connected to WhatsApp!');
+    }
+  });
+
+  // 🌅 DAILY MORNING MESSAGE at 6:00 AM IST
   cron.schedule('30 0 * * *', async () => {
     try {
-      console.log('🌄 Sending morning messages...');
-
       const allChats = await sock.groupFetchAllParticipating();
       const groupIds = Object.keys(allChats);
-
       const messages = [
         "🌞 Good Morning Gamers! 🎮 Let’s grind!",
         "🔥 New day, new loot! Good morning warriors!",
@@ -48,14 +45,31 @@
         "💡 Level up IRL too — good morning!"
       ];
       const message = messages[Math.floor(Math.random() * messages.length)];
-
       for (const groupId of groupIds) {
         await sock.sendMessage(groupId, { text: message });
       }
-
-      console.log('✅ Morning messages sent!');
     } catch (err) {
       console.error('❌ Error sending morning messages:', err.message);
+    }
+  });
+
+  // 🌙 DAILY GOOD NIGHT MESSAGE at 7:00 PM IST
+  cron.schedule('30 13 * * *', async () => {
+    try {
+      const allChats = await sock.groupFetchAllParticipating();
+      const groupIds = Object.keys(allChats);
+      const messages = [
+        "🌙 Good night, legends! Recharge and respawn tomorrow.",
+        "💤 Sleep mode: ON. Dream of victory!",
+        "😴 May your dreams be lag-free and full of loot!",
+        "🌌 Logging out IRL. GG for today, see you tomorrow!"
+      ];
+      const message = messages[Math.floor(Math.random() * messages.length)];
+      for (const groupId of groupIds) {
+        await sock.sendMessage(groupId, { text: message });
+      }
+    } catch (err) {
+      console.error('❌ Error sending good night messages:', err.message);
     }
   });
 
@@ -108,8 +122,6 @@
         ? 'text'
         : null);
 
-    console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
-
     let participants = [], admins = [];
     if (isGroup) {
       try {
@@ -124,23 +136,31 @@
     }
 
     // 🚫 Delete non-admin link shares
-    if (isGroup && linkRegex.test(text)) {
-  if (!admins.includes(sender)) {
-    try {
-      await sock.sendMessage(from, {
-        delete: {
-          remoteJid: from,
-          fromMe: false,
-          id: msg.key.id,
-          participant: sender
-        }
-      });
-
-    } catch (err) {
-      console.error('❌ Failed to delete link message:', err.message);
+    if (isGroup && linkRegex.test(text) && !admins.includes(sender)) {
+      try {
+        await sock.sendMessage(from, {
+          delete: {
+            remoteJid: from,
+            fromMe: false,
+            id: msg.key.id,
+            participant: sender
+          }
+        });
+      } catch (err) {
+        console.error('❌ Failed to delete link message:', err.message);
+      }
     }
-  }
-}
+
+    // 🐒 Special "hari" text response
+    if (isGroup && text.toLowerCase().includes("hari")) {
+      const hariId = "916282995415@s.whatsapp.net";  // ✅ Replace with correct ID
+      const replyText = "അണ്ടിക്കോയെ 🍆തോൽപ്പിക്കാൻ ഒരു അണ്ടിക്കും സാധിക്കില്ല എന്ന് പറഞ്ഞുകൊണ്ട് 💪🛑 ഹരി (Andikoya) അണ്ടി 🍆പൊക്കി നിൽക്കുന്നു 😎🔥🐒👑";
+      await sock.sendMessage(from, {
+        text: replyText,
+        mentions: [hariId]
+      });
+      return;
+    }
 
     // 🤝 Forward to Flask Bot
     try {
@@ -153,8 +173,6 @@
         admins,
         sender
       });
-
-      console.log('📥 Flask response:', response.data);
 
       if (response.data.delete) {
         await sock.sendMessage(from, { delete: msg.key });

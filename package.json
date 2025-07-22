@@ -14,7 +14,6 @@
     "@hapi/boom": "^10.0.1",
     "@types/node": "^22.13.11",
     "@whiskeysockets/baileys": "^6.7.18",
-    "@whiskeysockets/bailyes": "file:.5.0",
     "axios": "^1.10.0",
     "express": "^5.1.0",
     "node-cron": "^4.2.1",

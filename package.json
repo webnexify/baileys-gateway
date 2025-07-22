@@ -1,23 +1,24 @@
 {
-  "name": "whatsapp-bot",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@hapi/boom": "^10.0.1",
-    "@types/node": "^22.13.11",
-    "@whiskeysockets/baileys": "^6.7.18",
-    "@whiskeysockets/bailyes": "file:.5.0",
-    "axios": "^1.10.0",
-    "express": "^5.1.0",
-    "node-cron": "^4.2.1",
-    "pino": "^9.7.0",
-    "qrcode-terminal": "^0.12.0"
-  },
-  "description": ""
+  "name": "whatsapp-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@types/node": "^22.13.11",
+    "@whiskeysockets/baileys": "^6.7.18",
+    "@whiskeysockets/bailyes": "file:.5.0",
+    "axios": "^1.10.0",
+    "express": "^5.1.0",
+    "node-cron": "^4.2.1",
+    "pino": "^9.7.0",
+    "qrcode-terminal": "^0.12.0"
+  }
 }

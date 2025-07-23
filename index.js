@@ -126,6 +126,15 @@ const cron = require('node-cron');
         ? 'text'
         : null);
     console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
+    console.log("📩 New message received");
+console.log("Message:", msg.message);
+    console.log("➡️ Sending to Flask:", {
+  sender: msg.key.participant,
+  text: messageText,
+  from,
+  isGroup
+});
+
 
 
     let participants = [], admins = [];

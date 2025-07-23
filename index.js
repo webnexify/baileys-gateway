@@ -5,7 +5,6 @@ app.get("/", (_, res) => res.send("Bot is running."));
 app.listen(3000, () => console.log("✅ Web server started on port 3000"));
 let remindersEnabled = true;  // 🔁 Default: reminders are ON
 
-
 // ✅ 2. Import other modules
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
@@ -35,7 +34,7 @@ const cron = require('node-cron');
     }
   });
 
-  // 🌅 DAILY MORNING MESSAGE at 6:00 AM IST
+  // 🌅 DAILY MORNING MESSAGE at 6:00 AM IST (00:30 UTC)
   cron.schedule('30 0 * * *', async () => {
     try {
       const allChats = await sock.groupFetchAllParticipating();
@@ -55,7 +54,7 @@ const cron = require('node-cron');
     }
   });
 
-  // 🌙 DAILY GOOD NIGHT MESSAGE at 11:45 PM IST (which is 18:15 UTC)
+  // 🌙 DAILY GOOD NIGHT MESSAGE at 11:45 PM IST (18:15 UTC)
   cron.schedule('15 18 * * *', async () => {
     try {
       const allChats = await sock.groupFetchAllParticipating();
@@ -75,7 +74,6 @@ const cron = require('node-cron');
     }
   });
 
-  
   // 👋 Welcome New Participants
   sock.ev.on('group-participants.update', async (update) => {
     const { id, participants, action } = update;
@@ -105,16 +103,14 @@ const cron = require('node-cron');
 
   // 💬 Handle Messages
   sock.ev.on('messages.upsert', async (m) => {
-    const linkRegex = /(https?:\/\/[^\s]+)/gi;
     const msg = m.messages[0];
     if (!msg.message || msg.key.fromMe) return;
 
     const from = msg.key.remoteJid;
-    console.log('Group ID:', from);  // ✅ log group ID
     const isGroup = from.endsWith('@g.us');
     const sender = msg.key.participant || msg.key.remoteJid;
 
-    const text =
+    const messageText =
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
       msg.message.imageMessage?.caption ||
@@ -122,38 +118,20 @@ const cron = require('node-cron');
 
     const type = msg.message?.stickerMessage
       ? 'sticker'
-      : (msg.message.conversation || msg.message.extendedTextMessage?.text
-        ? 'text'
-        : null);
-    console.log(`📨 ${isGroup ? 'Group' : 'Private'} message from ${from}: ${text}`);
-    console.log("📩 New message received");
-console.log("Message:", msg.message);
-    console.log("➡️ Sending to Flask:", {
-  sender: msg.key.participant,
-  text: messageText,
-  from,
-  isGroup
-});
-
-
+      : (messageText ? 'text' : null);
 
     let participants = [], admins = [];
     if (isGroup) {
       try {
         const metadata = await sock.groupMetadata(from);
-        participants = metadata.participants.map((p) => p.id);
-        admins = metadata.participants
-          .filter((p) => p.admin !== null)
-          .map((p) => p.id);
+        participants = metadata.participants.map(p => p.id);
+        admins = metadata.participants.filter(p => p.admin !== null).map(p => p.id);
       } catch (err) {
         console.error('❌ Group metadata error:', err.message);
       }
     }
-    
 
-    
-    // 🔔 reminder button
-    
+    // 🔘 Reminder Toggle
     const buttonReply = msg.message?.buttonsResponseMessage;
     if (buttonReply && buttonReply.selectedButtonId === 'toggle_reminder') {
       remindersEnabled = !remindersEnabled;
@@ -162,7 +140,7 @@ console.log("Message:", msg.message);
       });
     }
 
-    if (text === '.reminder' && isGroup && admins.includes(sender)) {
+    if (messageText === '.reminder' && isGroup && admins.includes(sender)) {
       await sock.sendMessage(from, {
         text: `🛠️ Reminder system is currently *${remindersEnabled ? 'ENABLED' : 'DISABLED'}*.\n\nWould you like to toggle it?`,
         buttons: [
@@ -172,13 +150,14 @@ console.log("Message:", msg.message);
         headerType: 1
       });
     }
-    
+
+    // 🔔 Daily Reminders
     const allowedGroups = [
       '120363048505746465@g.us',
       '120363419378716476@g.us'
     ];
 
-    // 🕘 9:00 PM IST = 15:30 UTC - First Full Reminder
+    // 9:00 PM IST = 15:30 UTC
     cron.schedule('30 15 * * *', async () => {
       if (!remindersEnabled) return;
 
@@ -197,7 +176,7 @@ console.log("Message:", msg.message);
       }
     });
 
-    // 🕤 9:30 PM IST = 16:00 UTC - Final Full Reminder
+    // 9:30 PM IST = 16:00 UTC
     cron.schedule('0 16 * * *', async () => {
       if (!remindersEnabled) return;
 
@@ -216,9 +195,9 @@ console.log("Message:", msg.message);
       }
     });
 
-
     // 🚫 Delete non-admin link shares
-    if (isGroup && linkRegex.test(text) && !admins.includes(sender)) {
+    const linkRegex = /(https?:\/\/[^\s]+)/gi;
+    if (isGroup && linkRegex.test(messageText) && !admins.includes(sender)) {
       try {
         await sock.sendMessage(from, {
           delete: {
@@ -233,10 +212,9 @@ console.log("Message:", msg.message);
       }
     }
 
-    // 🐒 Special "hari" text response
-    if (isGroup && text.toLowerCase().includes("hari")) {
-      //const hariId = "916282995415@s.whatsapp.net";
-      const hari_Id = '@~Hari';// ✅ Replace with correct ID
+    // 🐒 Special "hari" response
+    if (isGroup && messageText.toLowerCase().includes("hari")) {
+      const hari_Id = '@~Hari';  // Update to actual WhatsApp ID if needed
       const replyText = "അണ്ടിക്കോയെ 🍆 തോൽപ്പിക്കാൻ ഒരു അണ്ടിക്കും സാധിക്കില്ല എന്ന് പറഞ്ഞുകൊണ്ട് 💪🛑 ഹരി (Andikoya)😎🔥🐒👑";
       await sock.sendMessage(from, {
         text: replyText,
@@ -249,10 +227,10 @@ console.log("Message:", msg.message);
     try {
       const response = await axios.post('https://whtzaap-bot.onrender.com/message', {
         from,
-        text,
+        text: messageText,
         type,
         isGroup,
-        groupId,
+        groupId: from,
         participants,
         admins,
         sender
@@ -263,15 +241,13 @@ console.log("Message:", msg.message);
       }
 
       if (response.data.reply) {
-    await sock.sendMessage(msg.key.remoteJid, {
-        text: response.data.reply,
-        mentions: response.data.mentions || [],
-    });
-}
-
+        await sock.sendMessage(from, {
+          text: response.data.reply,
+          mentions: response.data.mentions || [],
+        });
+      }
     } catch (err) {
       console.error('❌ Flask bot error:', err.message);
     }
   });
 })();
-

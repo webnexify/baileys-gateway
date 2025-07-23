@@ -243,7 +243,7 @@ const cron = require('node-cron');
         text,
         type,
         isGroup,
-        groupId
+        groupId,
         participants,
         admins,
         sender

@@ -243,6 +243,7 @@ const cron = require('node-cron');
         text,
         type,
         isGroup,
+        groupId
         participants,
         admins,
         sender
@@ -253,13 +254,15 @@ const cron = require('node-cron');
       }
 
       if (response.data.reply) {
-        await sock.sendMessage(from, {
-          text: response.data.reply,
-          mentions: response.data.mentions || [],
-        });
-      }
+    await sock.sendMessage(msg.key.remoteJid, {
+        text: response.data.reply,
+        mentions: response.data.mentions || [],
+    });
+}
+
     } catch (err) {
       console.error('❌ Flask bot error:', err.message);
     }
   });
 })();
+
